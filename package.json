@@ -1,0 +1,44 @@
+{
+  "name": "auth-service",
+  "version": "1.0.0",
+  "description": "A microservice that simply does authentication",
+  "main": "dist/index.js",
+  "packageManager": "yarn@4.9.2",
+  "author": "Rishabh Khurana",
+  "license": "MIT",
+  "scripts": {
+    "start:dev": "node scripts/create-env.js && docker compose -f docker-compose.dev.yml up",
+    "start:prod": "docker compose -f docker-compose.prod.yml up -d",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:push": "drizzle-kit push:pg",
+    "db:studio": "drizzle-kit studio",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@koa/cors": "^5.0.0",
+    "bcrypt": "^5.1.1",
+    "dotenv": "^16.3.1",
+    "drizzle-orm": "^0.29.0",
+    "jsonwebtoken": "^9.0.2",
+    "koa": "^2.15.0",
+    "koa-bodyparser": "^4.4.1",
+    "koa-router": "^12.0.1",
+    "postgres": "^3.4.3",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/koa": "^2.13.12",
+    "@types/koa-bodyparser": "^4.3.12",
+    "@types/koa-router": "^7.4.8",
+    "@types/koa__cors": "^5.0.0",
+    "@types/node": "^20.10.0",
+    "drizzle-kit": "^0.20.0",
+    "nodemon": "^3.0.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.2",
+    "vitest": "^1.0.4"
+  }
+}
