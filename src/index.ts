@@ -42,7 +42,7 @@ router.get("/health", (ctx) => {
   ctx.body = { status: "ok", timestamp: new Date().toISOString() };
 });
 
-router.post("/auth/register", async (ctx: RegisterContext) => {
+router.post("/auth/stateless/register", async (ctx: RegisterContext) => {
   const { email, password } = ctx.request.body;
 
   const validation = validateCredentials(email, password);
@@ -68,7 +68,7 @@ router.post("/auth/register", async (ctx: RegisterContext) => {
   ctx.body = authSuccess(token, { id: user.id, email: user.email });
 });
 
-router.post("/auth/login", async (ctx: LoginContext) => {
+router.post("/auth/stateless/login", async (ctx: LoginContext) => {
   const { email, password } = ctx.request.body;
 
   const validation = validateCredentials(email, password);

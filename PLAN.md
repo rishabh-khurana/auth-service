@@ -36,10 +36,9 @@ Auth operations are proven stateless: the server signs a token and forgets about
 
 ### Current state
 
-- [x] `POST /auth/register` — bcrypt hashing, user persisted, JWT returned
-- [x] `POST /auth/login` — password verified, JWT returned
+- [x] `POST /auth/stateless/register` — bcrypt hashing, user persisted, JWT returned
+- [x] `POST /auth/stateless/login` — password verified, JWT returned
 - [x] HS256 signing with `JWT_SECRET`
-- [ ] Rename routes to `/auth/stateless/*` prefix (once stateful routes are added, for clarity)
 - [x] ~~`POST /auth/stateless/logout`~~ — **Not implemented (by design)**. Stateless JWT logout is client-side only — the server has no session to invalidate. Client simply deletes the token from cookies/storage.
 
 ### Advanced stateless auth (beyond this project's scope)

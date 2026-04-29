@@ -100,7 +100,7 @@ The `algorithms` whitelist is mandatory. Without it, an attacker can craft a tok
 
 1. Generate key pair with `openssl`
 2. Set `JWT_PRIVATE_KEY` in auth-service `.env`, `JWT_PUBLIC_KEY` in translations-service `.env`
-3. `POST :3420/auth/register` → decode the JWT at jwt.io — header should show `"alg": "RS256"`
+3. `POST :3420/auth/stateless/register` → decode the JWT at jwt.io — header should show `"alg": "RS256"`
 4. `POST :3000/translate` with that token → success
 5. Tamper with the token signature → 401
 6. Attempt HS256 algorithm confusion attack → rejected by the `algorithms` whitelist
