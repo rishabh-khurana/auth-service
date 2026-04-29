@@ -32,7 +32,7 @@ Auth operations are proven stateless: the server signs a token and forgets about
 |--------|------|-------------|
 | POST | `/auth/stateless/register` | Hash password, persist user, return signed JWT |
 | POST | `/auth/stateless/login` | Verify password, return signed JWT |
-| POST | `/auth/stateless/logout` | Client-side only — instruct client to discard the token |
+| POST | `/auth/stateless/logout` | N/A — client-side only; client deletes token from cookies/storage |
 
 ### Current state
 
@@ -40,7 +40,7 @@ Auth operations are proven stateless: the server signs a token and forgets about
 - [x] `POST /auth/login` — password verified, JWT returned
 - [x] HS256 signing with `JWT_SECRET`
 - [ ] Rename routes to `/auth/stateless/*` prefix (once stateful routes are added, for clarity)
-- [ ] `POST /auth/stateless/logout` — return a response that instructs the client to drop the token; document *why* true server-side invalidation is not possible in pure stateless JWT
+- [x] ~~`POST /auth/stateless/logout`~~ — **Not implemented (by design)**. Stateless JWT logout is client-side only — the server has no session to invalidate. Client simply deletes the token from cookies/storage.
 
 ### Advanced stateless auth (beyond this project's scope)
 
@@ -57,6 +57,10 @@ The current implementation uses HS256 (shared secret). For production/multi-serv
 ### Key concept: why logout is a problem for stateless auth
 
 A JWT is valid until it expires — the server has no blacklist. "Logout" in a stateless system means the **client** deletes the token. If a token is stolen before expiry, there is no way to revoke it without adding server-side state (which breaks the stateless property). Short expiry times + refresh-token rotation are the common mitigation.
+
+#### Why a server-side logout route is pointless for stateless auth
+
+Since the server is truly stateless, it doesn't track issued tokens. A `POST /auth/stateless/logout` endpoint would have nothing to do — there's no session database entry to delete, no server-side state to invalidate. The token remains valid until expiry regardless of what the server does. The only meaningful "logout" action is for the **client** to remove the token from cookies or localStorage. Any server-side "logout" route would just return a 200 OK without actually invalidating anything, creating a false sense of security. This is not an implementation omission — it's a fundamental characteristic of stateless authentication.
 
 ---
 
