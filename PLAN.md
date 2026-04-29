@@ -77,10 +77,14 @@ Auth operations use server-stored sessions. The client holds a session ID (in an
 
 ### Implementation steps
 
-- [ ] Add `sessions` table to Drizzle schema (`id`, `userId`, `createdAt`, `expiresAt`)
-- [ ] `POST /auth/stateful/register` — register user, create session row, set `Set-Cookie: sessionId=...; HttpOnly`
-- [ ] `POST /auth/stateful/login` — verify password, create session row, set cookie
-- [ ] `POST /auth/stateful/logout` — delete session row, clear cookie (`Set-Cookie: sessionId=; Max-Age=0`)
+- [x] `POST /auth/stateful/register` — implemented with session creation and HttpOnly cookie
+- [ ] `POST /auth/stateful/login` — route created (placeholder response)
+- [x] `POST /auth/stateful/logout` — implemented with session deletion and cookie clearing
+- [x] Add `user_sessions` table to Drizzle schema
+- [x] Run database migration to create `user_sessions` table
+- [ ] Implement `POST /auth/stateful/register` — register user, create session row, set `Set-Cookie: sessionId=...; HttpOnly`
+- [ ] Implement `POST /auth/stateful/login` — verify password, create session row, set cookie
+- [ ] Implement `POST /auth/stateful/logout` — delete session row, clear cookie (`Set-Cookie: sessionId=; Max-Age=0`)
 - [ ] Session middleware — on authenticated routes, read cookie → look up session → attach user to context
 
 ### Security concerns (stateful-specific)

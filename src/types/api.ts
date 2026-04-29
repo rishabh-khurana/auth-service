@@ -28,7 +28,10 @@ export interface RegisterSuccessData {
   };
 }
 
-export type RegisterResponse = SuccessResponse<RegisterSuccessData> | ErrorResponse;
+export type RegisterResponse =
+  | SuccessResponse<RegisterSuccessData>
+  | SuccessResponse<RegisterSuccessData["user"]>
+  | ErrorResponse;
 
 export interface LoginRequestBody {
   email: string;
