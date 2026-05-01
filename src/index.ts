@@ -8,7 +8,7 @@ import crypto from "crypto";
 import { errorHandler } from "./middleware/errorHandler";
 import { env } from "./config/env";
 import { db } from "./db";
-import { users, userSessions } from "./db/schema";
+import { users, refreshTokens } from "./db/schema";
 import type {
   RegisterRequestBody,
   RegisterResponse,
@@ -22,6 +22,7 @@ import {
   authSuccess,
   success,
 } from "./utils/response";
+import { clearAuthCookies, setAuthCookies, ONE_DAY } from "./utils/cookies";
 
 interface RegisterContext extends Context {
   request: Context["request"] & { body: RegisterRequestBody };
@@ -32,8 +33,6 @@ interface LoginContext extends Context {
   request: Context["request"] & { body: LoginRequestBody };
   body: LoginResponse;
 }
-
-const ONE_DAY = 24 * 60 * 60 * 1000;
 
 const app = new Koa();
 const router = new Router<unknown, RegisterContext | LoginContext>();
@@ -141,25 +140,149 @@ router.post("/auth/stateful/register", async (ctx: RegisterContext) => {
     throw err;
   }
 
-  // Generate session ID and expiration (1 hour from now)
-  const sessionId = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + ONE_DAY); // 1 hour
+  // Generate access token (JWT, stateless, not stored in DB) - 1 hour expiry
+  const accessToken = generateToken(user.id, user.email);
 
-  // Insert session into database
-  await db.insert(userSessions).values({
+  // Generate refresh token (opaque, stored in DB) - 1 day expiry
+  const refreshToken = crypto.randomBytes(32).toString("hex");
+  const refreshTokenExpiresAt = new Date(Date.now() + ONE_DAY);
+
+  // Store refresh token in database
+  await db.insert(refreshTokens).values({
     userId: user.id,
-    sessionId,
-    expiresAt,
+    token: refreshToken,
+    expiresAt: refreshTokenExpiresAt,
   });
 
-  // Set HttpOnly cookie with session ID
-  ctx.cookies.set("sessionId", sessionId, {
-    httpOnly: true,
-    secure: env.nodeEnv === "production",
-    sameSite: "lax",
-    maxAge: ONE_DAY, // 1 hour in ms
-    path: "/",
+  // Set HttpOnly cookies
+  // Note: In production, use ambiguous names like "sessionId" instead of "accessToken"
+  setAuthCookies(ctx, accessToken, refreshToken);
+
+  ctx.body = success({
+    id: user.id,
+    email: user.email,
   });
+});
+
+router.post("/auth/stateful/login", async (ctx: LoginContext) => {
+  const { email, password } = ctx.request.body;
+
+  // Validate credentials
+  const validation = validateCredentials(email, password);
+  if (!validation.valid) {
+    ctx.status = 400;
+    ctx.body = validation.response;
+    return;
+  }
+
+  // Find user by email
+  const user = await db.query.users.findFirst({
+    where: eq(users.email, email),
+  });
+
+  if (!user) {
+    ctx.status = 401;
+    ctx.body = error("Invalid email or password", 401);
+    return;
+  }
+
+  // Verify password
+  const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+  if (!isPasswordValid) {
+    ctx.status = 401;
+    ctx.body = error("Invalid email or password", 401);
+    return;
+  }
+
+  // Generate access token (JWT, stateless) - 1 hour expiry
+  const accessToken = generateToken(user.id, user.email);
+
+  // Generate refresh token (opaque, stored in DB) - 1 day expiry
+  const refreshToken = crypto.randomBytes(32).toString("hex");
+  const refreshTokenExpiresAt = new Date(Date.now() + ONE_DAY);
+
+  // Store refresh token in database
+  await db.insert(refreshTokens).values({
+    userId: user.id,
+    token: refreshToken,
+    expiresAt: refreshTokenExpiresAt,
+  });
+
+  // Set HttpOnly cookies
+  setAuthCookies(ctx, accessToken, refreshToken);
+
+  ctx.body = success({
+    id: user.id,
+    email: user.email,
+  });
+});
+
+router.post("/auth/stateful/refresh", async (ctx) => {
+  // Get refresh token from cookie
+  const currentRefreshToken = ctx.cookies.get("refreshToken");
+
+  if (!currentRefreshToken) {
+    clearAuthCookies(ctx);
+    ctx.status = 401;
+    ctx.body = error("No refresh token provided", 401);
+    return;
+  }
+
+  // Look up refresh token in database
+  const storedToken = await db.query.refreshTokens.findFirst({
+    where: eq(refreshTokens.token, currentRefreshToken),
+  });
+
+  if (!storedToken) {
+    clearAuthCookies(ctx);
+    ctx.status = 401;
+    ctx.body = error("Invalid refresh token", 401);
+    return;
+  }
+
+  // Check if token is expired - clean it up and clear cookies
+  if (storedToken.expiresAt < new Date()) {
+    // Delete expired token from database
+    await db.delete(refreshTokens).where(eq(refreshTokens.id, storedToken.id));
+    clearAuthCookies(ctx);
+    ctx.status = 401;
+    ctx.body = error("Refresh token expired", 401);
+    return;
+  }
+
+  // Get user info
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, storedToken.userId),
+  });
+
+  if (!user) {
+    // Clean up orphaned token
+    await db.delete(refreshTokens).where(eq(refreshTokens.id, storedToken.id));
+    clearAuthCookies(ctx);
+    ctx.status = 401;
+    ctx.body = error("User not found", 401);
+    return;
+  }
+
+  // Single-use rotation: Delete old refresh token
+  await db.delete(refreshTokens).where(eq(refreshTokens.id, storedToken.id));
+
+  // Generate new access token (JWT)
+  const newAccessToken = generateToken(user.id, user.email);
+
+  // Generate new refresh token (opaque)
+  const newRefreshToken = crypto.randomBytes(32).toString("hex");
+  const newRefreshTokenExpiresAt = new Date(Date.now() + ONE_DAY);
+
+  // Store new refresh token
+  await db.insert(refreshTokens).values({
+    userId: user.id,
+    token: newRefreshToken,
+    expiresAt: newRefreshTokenExpiresAt,
+  });
+
+  // Set new cookies
+  setAuthCookies(ctx, newAccessToken, newRefreshToken);
 
   ctx.body = success({
     id: user.id,
@@ -168,22 +291,16 @@ router.post("/auth/stateful/register", async (ctx: RegisterContext) => {
 });
 
 router.post("/auth/stateful/logout", async (ctx) => {
-  // Get session ID from cookie
-  const sessionId = ctx.cookies.get("sessionId");
+  // Get refresh token from cookie
+  const refreshToken = ctx.cookies.get("refreshToken");
 
-  if (sessionId) {
-    // Delete session from database
-    await db.delete(userSessions).where(eq(userSessions.sessionId, sessionId));
+  if (refreshToken) {
+    // Delete refresh token from database
+    await db.delete(refreshTokens).where(eq(refreshTokens.token, refreshToken));
   }
 
-  // Clear the cookie regardless of whether session existed
-  ctx.cookies.set("sessionId", "", {
-    httpOnly: true,
-    secure: env.nodeEnv === "production",
-    sameSite: "lax",
-    maxAge: 0, // Expire immediately
-    path: "/",
-  });
+  // Clear both cookies
+  clearAuthCookies(ctx);
 
   ctx.body = success({
     message: "Logged out successfully",

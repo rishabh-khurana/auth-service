@@ -38,7 +38,7 @@ export interface LoginRequestBody {
   password: string;
 }
 
-export interface LoginSuccessData {
+export interface LoginStatelessSuccessData {
   token: string;
   user: {
     id: number;
@@ -46,4 +46,8 @@ export interface LoginSuccessData {
   };
 }
 
-export type LoginResponse = SuccessResponse<LoginSuccessData> | ErrorResponse;
+export type LoginResponse =
+  | SuccessResponse<
+      LoginStatelessSuccessData | LoginStatelessSuccessData["user"]
+    >
+  | ErrorResponse;

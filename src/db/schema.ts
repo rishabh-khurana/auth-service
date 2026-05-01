@@ -9,23 +9,25 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const userSessions = pgTable('user_sessions', {
+// Refresh tokens only - opaque tokens stored in DB for revocation and rotation
+// Access tokens are stateless JWTs (not stored in DB)
+export const refreshTokens = pgTable('refresh_tokens', {
   id: serial('id').primaryKey(),
   userId: integer('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
-  sessionId: varchar('session_id', { length: 255 }).notNull().unique(),
+  token: varchar('token', { length: 64 }).notNull().unique(), // random bytes as hex
   expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 export const usersRelations = relations(users, ({ many }) => ({
-  sessions: many(userSessions),
+  refreshTokens: many(refreshTokens),
 }));
 
-export const userSessionsRelations = relations(userSessions, ({ one }) => ({
+export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
   user: one(users, {
-    fields: [userSessions.userId],
+    fields: [refreshTokens.userId],
     references: [users.id],
   }),
 }));
