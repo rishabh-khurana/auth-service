@@ -23,6 +23,7 @@ import {
   success,
 } from "./utils/response";
 import { clearAuthCookies, setAuthCookies, ONE_DAY } from "./utils/cookies";
+import { getPublicKey } from "./utils/secrets";
 
 interface RegisterContext extends Context {
   request: Context["request"] & { body: RegisterRequestBody };
@@ -305,6 +306,13 @@ router.post("/auth/stateful/logout", async (ctx) => {
   ctx.body = success({
     message: "Logged out successfully",
   });
+});
+
+router.get("/.well-known/jwks.json", (ctx) => {
+  const jwkObject = getPublicKey();
+  ctx.body = {
+    keys: [jwkObject],
+  };
 });
 
 app.use(router.routes());

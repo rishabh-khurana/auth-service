@@ -1,12 +1,12 @@
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
 
-if (process.env.NODE_ENV === 'production') {
-  console.log('Production mode - expecting .env to be provided');
+if (process.env.NODE_ENV === "production") {
+  console.log("Production mode - expecting .env to be provided");
   return;
 }
 
-const envPath = path.join(__dirname, '..', '.env');
+const envPath = path.join(__dirname, "..", ".env");
 if (fs.existsSync(envPath)) {
   return;
 }
@@ -23,4 +23,4 @@ DATABASE_URL=postgresql://postgres:postgres@postgres:5432/auth
 `;
 
 fs.writeFileSync(envPath, template);
-console.log('.env created for local development');
+console.log(".env created for local development");
